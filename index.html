@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dqts Fragrance Corner and Emporium</title>
+  <title>Hybrid POS & Business Suite</title>
   <style>
     :root { --primary: #4f46e5; --bg: #f4f5f7; --card: #ffffff; --text: #1f2937; }
     * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
@@ -76,7 +76,7 @@
   <!-- AUTH OVERLAY -->
   <div id="authOverlay">
     <div class="auth-box">
-      <h3 style="margin-top:0;">Dqts</h3>
+      <h3 style="margin-top:0;">POS Login</h3>
       <form onsubmit="handleLogin(event)">
         <input type="text" id="loginUsername" placeholder="Username" required>
         <input type="password" id="loginPassword" placeholder="Password" required>
@@ -86,7 +86,7 @@
     </div>
   </div>
   <header>
-    <h2 style="margin:0;">Welcome</h2>
+    <h2 style="margin:0;">Hybrid Business POS</h2>
     <div style="display:flex; align-items:center; gap:15px;">
       <span id="userInfo" style="font-weight:bold; font-size:14px;">Not Logged In</span>
       <div id="statusBadge" class="status-badge online">Checking connection...</div>
@@ -94,8 +94,8 @@
     </div>
   </header>
   <nav id="mainNav">
-    <button class="nav-btn active" onclick="switchTab('pos')">Sell Product</button>
-    <button class="nav-btn" onclick="switchTab('sales')">Sales History</button>
+    <button class="nav-btn active" onclick="switchTab('pos')">Register (POS)</button>
+    <button class="nav-btn" onclick="switchTab('sales')">Sales & Receipts</button>
     <button class="nav-btn admin-only" onclick="switchTab('inventory')">Inventory</button>
     <button class="nav-btn admin-only" onclick="switchTab('expenses')">Expenses</button>
     <button class="nav-btn admin-only" onclick="switchTab('analytics')">Analytics</button>
@@ -220,7 +220,7 @@
   <div id="tab-analytics" class="tab-content">
     <!-- SECTION 1: FINANCES & ANALYTICS -->
     <div class="card">
-      <h3 style="margin-top:0; margin-bottom:15px;">Finances & Analytics</h3>
+      <h3 style="margin-top:0; margin-bottom:15px;">💰 Finances & Analytics</h3>
       <div class="grid-4">
         <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
           <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Total Stock</h4>
@@ -339,14 +339,14 @@
   <div id="receiptModal">
     <div class="receipt-box">
       <div id="receiptArea">
-        <h3 style="text-align:center; margin:0;">Dqts Fragrance Corner and Emporium</h3>
+        <h3 style="text-align:center; margin:0;">STORE RECEIPT</h3>
         <p style="text-align:center; font-size:12px; margin:2px 0;" id="recCashier"></p>
         <p style="text-align:center; font-size:11px;" id="recDate"></p>
         <hr>
         <div id="recItems"></div>
         <hr>
         <h4 style="display:flex; justify-content:space-between;"><span>TOTAL:</span><span id="recTotal"></span></h4>
-        <p style="text-align:center; font-size:11px;">Thank you for shopping with us!</p>
+        <p style="text-align:center; font-size:11px;">Thank you for your business!</p>
       </div>
       <button class="btn-primary" style="width:100%; margin-top:10px;" onclick="window.print()">Print</button>
       <button style="width:100%; margin-top:5px;" onclick="closeModal()">Close</button>
@@ -872,6 +872,53 @@
         date: new Date().toISOString(),
         synced: false
       };
+      
+      const localDb = await openDB();
+
+      // Perform local IndexedDB transaction: deduct stock and save sale record atomically
+      try {
+        await new Promise((resolve, reject) => {
+          const tx = localDb.transaction(["inventory", "sales"], "readwrite");
+          const invStore = tx.objectStore("inventory");
+          const salesStore = tx.objectStore("sales");
+
+          // Fetch all local inventory items first to safely verify and deduct stock
+          const getReq = invStore.getAll();
+          getReq.onsuccess = () => {
+            const inventory = getReq.result;
+            const invMap = new Map(inventory.map(i => [i.id, i]));
+
+            for (const cartItem of cart) {
+              let invItem = cartItem.id ? invMap.get(cartItem.id) : null;
+              if (!invItem) {
+                invItem = inventory.find(i => i.name.toLowerCase() === (cartItem.name || '').toLowerCase());
+              }
+              if (!invItem) {
+                reject(new Error(`Product ${cartItem.name} not found in inventory.`));
+                return;
+              }
+              if (invItem.stock < cartItem.qty) {
+                reject(new Error(`Insufficient stock for ${cartItem.name}. Only ${formatNum(invItem.stock)} left.`));
+                return;
+              }
+              invItem.stock -= cartItem.qty;
+              invItem.synced = false;
+              invStore.put(invItem);
+            }
+
+            salesStore.put(sale);
+          };
+          getReq.onerror = () => reject(getReq.error);
+
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch (err) {
+        alert(err.message);
+        return;
+      }
+
+      // If online, perform Firestore transaction to update inventory and save sale server-side
       if (navigator.onLine) {
         try {
           await db.runTransaction(async (transaction) => {
@@ -894,28 +941,13 @@
             transaction.set(saleRef, { ...sale, synced: true }, { merge: true });
           });
           sale.synced = true;
+          // Update local sales record status to synced
+          await dbAction("sales", "readwrite", store => store.put(sale));
         } catch (err) {
-          console.error("Online checkout transaction failed, falling back to local:", err);
-          alert(err.message);
-          return;
+          console.error("Online checkout transaction failed, saved locally for background sync:", err);
         }
       }
-      const localDb = await openDB();
-      await new Promise((resolve, reject) => {
-        const tx = localDb.transaction(["inventory", "sales"], "readwrite");
-        const invStore = tx.objectStore("inventory");
-        const salesStore = tx.objectStore("sales");
-        for (const cartItem of cart) {
-          const invItem = inventoryCache.find(i => i.id === cartItem.id);
-          if (invItem) {
-            invItem.stock -= cartItem.qty;
-            invStore.put(invItem);
-          }
-        }
-        salesStore.put(sale);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => reject(tx.error);
-      });
+
       showReceipt(sale);
       cart = [];
       renderCart();
@@ -1423,9 +1455,10 @@
         refreshAll();
       });
       db.collection("sales").onSnapshot(async (snapshot) => {
-        const localDb = await openDB();
+        const localDb = wasOpen => openDB(); // safe reference
+        const localDbInstance = await openDB();
         await new Promise((resolve) => {
-          const tx = localDb.transaction("sales", "readwrite");
+          const tx = localDbInstance.transaction("sales", "readwrite");
           const store = tx.objectStore("sales");
           snapshot.docChanges().forEach(async (change) => {
             const data = change.doc.data();
@@ -1443,7 +1476,7 @@
         const localDb = await openDB();
         await new Promise((resolve) => {
           const tx = localDb.transaction("expenses", "readwrite");
-          const store = tx.objectStore("expenses");
+          const store = tx.objectStore(storeName => "expenses");
           snapshot.docChanges().forEach(async (change) => {
             const data = change.doc.data();
             if (change.type === "added" || change.type === "modified") {
@@ -1469,9 +1502,21 @@
       try {
         const localSales = await dbAction("sales", "readonly", store => store.getAll());
         for (const s of localSales.filter(x => !x.synced)) {
-          await db.collection("sales").doc(s.id).set({ ...s, synced: true }, { merge: true });
+          // Push unsynced offline sale to Firestore and perform the cloud inventory deduction at the same time
+          await db.runTransaction(async (transaction) => {
+            for (const cartItem of s.items) {
+              const invRef = db.collection("inventory").doc(cartItem.id);
+              const invDoc = await transaction.get(invRef);
+              if (invDoc.exists) {
+                const currentStock = invDoc.data().stock;
+                transaction.update(invRef, { stock: Math.max(0, currentStock - cartItem.qty) });
+              }
+            }
+            const saleRef = db.collection("sales").doc(s.id);
+            transaction.set(saleRef, { ...s, synced: true }, { merge: true });
+          });
           s.synced = true;
-          await dbAction("dbAction", "readwrite", store => store.put(s));
+          await dbAction("sales", "readwrite", store => store.put(s));
         }
         const localExpenses = await dbAction("expenses", "readonly", store => store.getAll());
         for (const e of localExpenses.filter(x => !x.synced)) {

@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hybrid POS & Business Suite</title>
+  <style>
+    :root { --primary: #4f46e5; --bg: #f4f5f7; --card: #ffffff; --text: #1f2937; }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+    
+    header { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px 25px; border-bottom: 1px solid #e5e7eb; }
+    .status-badge { padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 13px; }
+    .online { background: #e6f4ea; color: #137333; }
+    .offline { background: #fce8e6; color: #c5221f; }
+    nav { display: none; background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 20px; gap: 10px; }
+    nav button { padding: 14px 20px; border: none; background: none; font-weight: 600; cursor: pointer; color: #6b7280; border-bottom: 2px solid transparent; }
+    nav button.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-content { display: none; padding: 25px; }
+    .tab-content.active { display: block; }
+    .card { background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .grid-2 { display: grid; grid-template-columns: 2fr 1.2fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+    th { background: #fafafa; }
+    form { display: grid; gap: 12px; }
+    input, select, button { padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+    .btn-primary { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; }
+    .btn-danger { background: #ef4444; color: white; border: none; cursor: pointer; }
+    .btn-secondary { background: #6b7280; color: white; border: none; cursor: pointer; }
+    .btn-sm { padding: 4px 8px; font-size: 12px; }
+    /* Catalog Cards & Grid */
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; max-height: 520px; overflow-y: auto; padding-right: 5px; }
+    .product-card { padding: 15px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; text-align: center; cursor: pointer; transition: all 0.15s ease-in-out; display: flex; flex-direction: column; justify-content: space-between; height: 110px; user-select: none; }
+    .product-card:hover { border-color: var(--primary); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12); transform: translateY(-2px); }
+    .product-card:active { transform: translateY(0); }
+    .product-name { font-weight: 600; font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.2; }
+    .product-price { color: var(--primary); font-weight: 700; font-size: 15px; margin-top: 4px; }
+    .product-stock { font-size: 11px; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 12px; display: inline-block; margin-top: 4px; }
+    /* Cart Quantity Controls */
+    .cart-qty-ctrl { display: inline-flex; align-items: center; border: 1px solid #d1d5db; border-radius: 6px; overflow: hidden; background: #fff; }
+    .cart-qty-btn { background: #f9fafb; border: none; padding: 4px 8px; font-weight: bold; cursor: pointer; color: #374151; font-size: 13px; line-height: 1; }
+    .cart-qty-btn:hover { background: #e5e7eb; }
+    .cart-qty-input { width: 42px; border: none; text-align: center; padding: 4px 2px; font-size: 13px; font-weight: 600; appearance: textfield; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; }
+    .cart-qty-input::-webkit-outer-spin-button, .cart-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    /* Search Bar Input */
+    .search-input-box { width: 100%; padding: 12px 14px; font-size: 14px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; transition: border-color 0.2s; margin-bottom: 15px; }
+    .search-input-box:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+    /* Editable Table Fields - Expanded to accommodate larger numbers */
+    .table-input { width: 130px; padding: 6px; font-size: 13px; text-align: right; }
+    .table-input-stock { width: 75px; padding: 6px; font-size: 13px; text-align: center; }
+    /* Login Modal Overlay */
+    #authOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 999; }
+    .auth-box { background: #fff; padding: 30px; border-radius: 8px; width: 340px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+    /* Modal Overlays */
+    #receiptModal, #deleteChoiceModal, #checkoutConfirmModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 998; }
+    .receipt-box { background: white; padding: 25px; width: 320px; border-radius: 8px; font-family: monospace; }
+    
+    .delete-modal-box { background: white; padding: 25px; width: 420px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .delete-modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+    .delete-modal-actions button { width: 100%; padding: 12px; font-weight: 600; cursor: pointer; border-radius: 6px; font-size: 14px; }
+    @media print {
+      body * { visibility: hidden; }
+      #receiptArea, #receiptArea * { visibility: visible; }
+      #receiptArea { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+  <!-- Firebase Web SDK v9 (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- AUTH OVERLAY -->
+  <div id="authOverlay">
+    <div class="auth-box">
+      <h3 style="margin-top:0;">POS Login</h3>
+      <form onsubmit="handleLogin(event)">
+        <input type="text" id="loginUsername" placeholder="Username" required>
+        <input type="password" id="loginPassword" placeholder="Password" required>
+        <button type="submit" class="btn-primary">Sign In</button>
+      </form>
+      <p id="authError" style="color:#ef4444; font-size:12px; margin-top:10px;"></p>
+    </div>
+  </div>
+  <header>
+    <h2 style="margin:0;">Hybrid Business POS</h2>
+    <div style="display:flex; align-items:center; gap:15px;">
+      <span id="userInfo" style="font-weight:bold; font-size:14px;">Not Logged In</span>
+      <div id="statusBadge" class="status-badge online">Checking connection...</div>
+      <button id="logoutBtn" style="display:none;" onclick="handleLogout()" class="btn-sm btn-danger">Logout</button>
+    </div>
+  </header>
+  <nav id="mainNav">
+    <button class="nav-btn active" onclick="switchTab('pos')">Register (POS)</button>
+    <button class="nav-btn" onclick="switchTab('sales')">Sales & Receipts</button>
+    <button class="nav-btn admin-only" onclick="switchTab('inventory')">Inventory</button>
+    <button class="nav-btn admin-only" onclick="switchTab('expenses')">Expenses</button>
+    <button class="nav-btn admin-only" onclick="switchTab('analytics')">Analytics</button>
+    <button class="nav-btn admin-only" onclick="switchTab('users')">User Management</button>
+  </nav>
+  <!-- TAB 1: POS TERMINAL -->
+  <div id="tab-pos" class="tab-content">
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0; margin-bottom:12px;">Product Catalog</h3>
+        <input type="text" id="posSearchInput" class="search-input-box" placeholder="🔍 Search products by name..." oninput="renderCatalog()">
+        <div class="product-grid" id="posProductGrid"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0; margin-bottom:12px;">Current Cart</h3>
+        <table id="cartTable">
+          <thead><tr><th>Item</th><th style="text-align:center;">Qty</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="cartItems"></tbody>
+        </table>
+        <div style="margin-top:20px; border-top:2px solid #f3f4f6; padding-top:15px; display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Total:</h3>
+          <h2 style="margin:0; color:var(--primary);">₦<span id="cartTotal">0.00</span></h2>
+        </div>
+        <button class="btn-primary" style="width:100%; padding:15px; font-size:16px; margin-top:15px;" onclick="promptCheckout()">Checkout & Print Receipt</button>
+      </div>
+    </div>
+  </div>
+  <!-- TAB 2: SALES & RECEIPTS -->
+  <div id="tab-sales" class="tab-content">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+        <h3 style="margin:0;">Sales History</h3>
+        <button id="batchDeleteBtn" class="btn-danger btn-sm admin-only" style="display:none;" onclick="triggerBatchDelete()">Delete Selected</button>
+      </div>
+      
+      <input type="text" id="salesSearchInput" class="search-input-box" placeholder="🔍 Search receipts by Sale ID, Cashier, Date, or Amount..." oninput="filterSalesHistory()">
+      <table id="salesMainTable">
+        <thead>
+          <tr>
+            <th class="admin-only" style="width:30px; text-align:center;"><input type="checkbox" id="selectAllSales" onclick="toggleSelectAllSales(this)"></th>
+            <th>Sale ID</th>
+            <th>Cashier</th>
+            <th>Date</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Receipt</th>
+            <th class="admin-only">Action</th>
+          </tr>
+        </thead>
+        <tbody id="salesTable"></tbody>
+      </table>
+    </div>
+  </div>
+  <!-- TAB 3: INVENTORY -->
+  <div id="tab-inventory" class="tab-content">
+    <div style="display: grid; grid-template-columns: 1fr 2.8fr; gap: 20px;">
+      <div class="card">
+        <h3>Add Inventory Item</h3>
+        <form onsubmit="saveInventoryItem(event)">
+          <input type="text" id="invName" placeholder="Product Name" required>
+          <input type="number" step="0.01" id="invCostPrice" placeholder="Cost Price (₦)" required>
+          <input type="number" step="0.01" id="invPrice" placeholder="Selling Price (₦)" required>
+          <input type="number" id="invStock" placeholder="Initial Stock Quantity" required>
+          <button type="submit" class="btn-primary">Save Item</button>
+        </form>
+      </div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+          <h3 style="margin:0;">Current Stock Levels</h3>
+          <button id="batchDeleteInvBtn" class="btn-danger btn-sm admin-only" style="display:none;" onclick="triggerBatchDeleteInventory()">Delete Selected</button>
+        </div>
+        <input type="text" id="invSearchInput" class="search-input-box" placeholder="🔍 Search stocks by product name..." oninput="filterInventoryStock()">
+        <table id="inventoryMainTable">
+          <thead>
+            <tr>
+              <th class="admin-only" style="width:30px; text-align:center;"><input type="checkbox" id="selectAllInventory" onclick="toggleSelectAllInventory(this)"></th>
+              <th>Name</th>
+              <th>Cost (₦)</th>
+              <th>Price (₦)</th>
+              <th>Stock Adjustment</th>
+              <th class="admin-only">Action</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <!-- TAB 4: EXPENSES -->
+  <div id="tab-expenses" class="tab-content">
+    <div class="grid-2">
+      <div class="card">
+        <h3>Record Expense</h3>
+        <form onsubmit="saveExpense(event)">
+          <input type="text" id="expDesc" placeholder="Expense Description" required>
+          <input type="number" step="0.01" id="expAmount" placeholder="Amount (₦)" required>
+          <button type="submit" class="btn-primary">Record Expense</button>
+        </form>
+      </div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+          <h3 style="margin:0;">Logged Expenses</h3>
+          <button id="batchDeleteExpBtn" class="btn-danger btn-sm admin-only" style="display:none;" onclick="triggerBatchDeleteExpenses()">Delete Selected</button>
+        </div>
+        <input type="text" id="expSearchInput" class="search-input-box" placeholder="🔍 Search expenses by description or amount..." oninput="filterExpensesHistory()">
+        <table id="expensesMainTable">
+          <thead>
+            <tr>
+              <th class="admin-only" style="width:30px; text-align:center;"><input type="checkbox" id="selectAllExpenses" onclick="toggleSelectAllExpenses(this)"></th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Date</th>
+              <th class="admin-only">Action</th>
+            </tr>
+          </thead>
+          <tbody id="expensesTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <!-- TAB 5: ANALYTICS -->
+  <div id="tab-analytics" class="tab-content">
+    <!-- SECTION 1: FINANCES & ANALYTICS -->
+    <div class="card">
+      <h3 style="margin-top:0; margin-bottom:15px;">💰 Finances & Analytics</h3>
+      <div class="grid-4">
+        <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
+          <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Total Stock</h4>
+          <h2 style="margin:0; color:#1f2937;" id="anaTotalStock">0</h2>
+        </div>
+        <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
+          <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Total Stock Value</h4>
+          <h2 style="margin:0; color:#4f46e5;" id="anaStockValue">₦0.00</h2>
+        </div>
+        <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
+          <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Total Profit</h4>
+          <h2 style="margin:0; color:#10b981;" id="anaTotalProfit">₦0.00</h2>
+        </div>
+        <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
+          <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Total Expenses</h4>
+          <h2 style="margin:0; color:#ef4444;" id="anaTotalExpenses">₦0.00</h2>
+        </div>
+      </div>
+      <div style="margin-top:15px; background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; font-size:15px; color:#374151;">Net Profit (Total Profit - Total Expenses)</h3>
+        <h2 style="margin:0; color:#6366f1;" id="anaNetProfit">₦0.00</h2>
+      </div>
+    </div>
+    <!-- SECTION 2: PRODUCT PERFORMANCE -->
+    <div class="card">
+      <h3 style="margin-top:0; margin-bottom:15px;">📊 Product Performance</h3>
+      <div class="grid-4">
+        <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
+          <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Total Sales</h4>
+          <h2 style="margin:0; color:#1f2937;" id="anaTotalSalesCount">0</h2>
+        </div>
+        <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
+          <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Total Items Sold</h4>
+          <h2 style="margin:0; color:#1f2937;" id="anaTotalItemsSold">0</h2>
+        </div>
+        <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
+          <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Average Per Sale</h4>
+          <h2 style="margin:0; color:#4f46e5;" id="anaAvgPerSale">₦0.00</h2>
+        </div>
+        <div style="background:#f9fafb; padding:15px; border-radius:6px; border:1px solid #e5e7eb;">
+          <h4 style="margin:0 0 5px 0; color:#6b7280; font-size:13px;">Total Revenue</h4>
+          <h2 style="margin:0; color:#10b981;" id="anaTotalRevenue">₦0.00</h2>
+        </div>
+      </div>
+    </div>
+    <!-- SECTION 3: BEST SELLERS & PRODUCTS TO PROMOTE -->
+    <div class="grid-2" style="margin-bottom:0;">
+      <div class="card">
+        <h3 style="margin-top:0; margin-bottom:12px;">🏆 Best Sellers</h3>
+        <div id="anaBestSellersList">
+          <p style="color:#6b7280; font-style:italic; margin:0;">No sales data available.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0; margin-bottom:12px;">📢 Products to Promote</h3>
+        <div id="anaProductsToPromoteList" style="max-height: 220px; overflow-y: auto;">
+          <p style="color:#6b7280; font-style:italic; margin:0;">No sales data available yet.</p>
+        </div>
+      </div>
+    </div>
+    <!-- SECTION 4: ALL PRODUCTS PERFORMANCE TABLE -->
+    <div class="card">
+      <h3 style="margin-top:0; margin-bottom:15px;">📋 All Products Performance</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th style="text-align:center;">Units Sold</th>
+            <th style="text-align:right;">Revenue</th>
+            <th style="text-align:center;">Status</th>
+          </tr>
+        </thead>
+        <tbody id="anaAllProductsTable">
+          <tr><td colspan="4" style="text-align:center; color:#6b7280; font-style:italic;">No products found.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <!-- TAB 6: USER MANAGEMENT -->
+  <div id="tab-users" class="tab-content">
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <h3>Create New POS User</h3>
+          <form onsubmit="createUser(event)">
+            <input type="text" id="newUsername" placeholder="Username" required>
+            <input type="text" id="newUserPass" placeholder="Password" required>
+            <select id="newUserRole" required>
+              <option value="cashier">Cashier</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button type="submit" class="btn-primary">Create User Account</button>
+          </form>
+          <p id="userCreateStatus" style="font-size:12px; margin-top:10px;"></p>
+        </div>
+        <div class="card">
+          <h3>Change User Password</h3>
+          <form onsubmit="changePassword(event)">
+            <select id="changeUserSelect" required></select>
+            <input type="password" id="changeUserPass" placeholder="New Password" required>
+            <button type="submit" class="btn-primary">Update Password</button>
+          </form>
+          <p id="userPassStatus" style="font-size:12px; margin-top:10px;"></p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Local Users List</h3>
+        <table>
+          <thead><tr><th>Username</th><th>Password</th><th>Role</th><th>Action</th></tr></thead>
+          <tbody id="usersTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <!-- RECEIPT MODAL -->
+  <div id="receiptModal">
+    <div class="receipt-box">
+      <div id="receiptArea">
+        <h3 style="text-align:center; margin:0;">STORE RECEIPT</h3>
+        <p style="text-align:center; font-size:12px; margin:2px 0;" id="recCashier"></p>
+        <p style="text-align:center; font-size:11px;" id="recDate"></p>
+        <hr>
+        <div id="recItems"></div>
+        <hr>
+        <h4 style="display:flex; justify-content:space-between;"><span>TOTAL:</span><span id="recTotal"></span></h4>
+        <p style="text-align:center; font-size:11px;">Thank you for your business!</p>
+      </div>
+      <button class="btn-primary" style="width:100%; margin-top:10px;" onclick="window.print()">Print</button>
+      <button style="width:100%; margin-top:5px;" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+  <!-- CHECKOUT CONFIRMATION MODAL -->
+  <div id="checkoutConfirmModal">
+    <div class="delete-modal-box">
+      <h3 style="margin-top:0; color:#111827;">Confirm Checkout</h3>
+      <p style="color:#4b5563; font-size:14px; margin-bottom:15px;">Are you sure you want to complete this transaction and process the payment?</p>
+      <div style="background:#f9fafb; padding:12px; border-radius:6px; border:1px solid #e5e7eb; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:600; font-size:14px;">Total Amount:</span>
+        <span style="font-weight:700; color:var(--primary); font-size:16px;">₦<span id="checkoutModalTotal">0.00</span></span>
+      </div>
+      <div class="delete-modal-actions">
+        <button class="btn-primary" onclick="confirmCheckoutAction()">Yes, Complete Checkout</button>
+        <button class="btn-secondary" onclick="closeCheckoutConfirmModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <!-- OPTION 2 DELETION CHOICE MODAL -->
+  <div id="deleteChoiceModal">
+    <div class="delete-modal-box">
+      <h3 style="margin-top:0; color:#111827;" id="deleteModalTitle">Delete Record</h3>
+      <p style="color:#4b5563; font-size:14px; margin-bottom:5px;" id="deleteModalSubtext">Select how you want to process this deletion:</p>
+      
+      <div class="delete-modal-actions" id="deleteModalActionsContainer">
+        <!-- Dynamically injected based on context -->
+      </div>
+    </div>
+  </div>
+  <script>
+    // HELPER: Format Numbers with Commas (e.g., 3,000,000)
+    function formatNum(val, decimals = 0) {
+      const num = parseFloat(val);
+      if (isNaN(num)) return '0';
+      return num.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+    }
+    // 1. FIREBASE CONFIG
+    const firebaseConfig = {
+      apiKey: "AIzaSyATwUVy2xzqtPTQjeZGoP_l2rZD9e9TVlA",
+      authDomain: "pos-b73bd.firebaseapp.com",
+      databaseURL: "https://pos-b73bd-default-rtdb.firebaseio.com",
+      projectId: "pos-b73bd",
+      storageBucket: "pos-b73bd.firebasestorage.app",
+      messagingSenderId: "1014854085679",
+      appId: "1:1014854085679:web:6495d5c4b03a4415916ada",
+      measurementId: "G-J4Z8H1NXC5"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    // 2. LOCAL AUTH & ROLE MANAGEMENT
+    let currentUser = null;
+    let inventoryCache = [];
+    const terminalId = 'POS-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    async function initLocalUsers() {
+      if (navigator.onLine) {
+        try {
+          const snapshot = await db.collection("users").get();
+          if (snapshot.empty) {
+            await db.collection("users").doc("admin").set({ username: 'admin', pass: '1234', role: 'admin' });
+          } else {
+            let cloudUsers = [];
+            snapshot.forEach(doc => cloudUsers.push(doc.data()));
+            localStorage.setItem('pos_users', JSON.stringify(cloudUsers));
+          }
+        } catch (err) {
+          console.error("Failed to fetch cloud users during init:", err);
+        }
+      }
+      let users = JSON.parse(localStorage.getItem('pos_users') || '[]');
+      if (users.length === 0) {
+        users.push({ username: 'admin', pass: '1234', role: 'admin' });
+        localStorage.setItem('pos_users', JSON.stringify(users));
+      }
+    }
+    window.onload = async () => {
+      await initLocalUsers();
+      const cached = localStorage.getItem("cachedUser");
+      if (cached) {
+        currentUser = JSON.parse(cached);
+        showAppUI();
+      } else {
+        hideAppUI();
+      }
+    };
+    function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById("loginUsername").value.trim();
+      const pass = document.getElementById("loginPassword").value;
+      document.getElementById("authError").textContent = "";
+      const users = JSON.parse(localStorage.getItem('pos_users') || '[]');
+      const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.pass === pass);
+      if (user) {
+        currentUser = { username: user.username, role: user.role };
+        localStorage.setItem("cachedUser", JSON.stringify(currentUser));
+        showAppUI();
+      } else {
+        document.getElementById("authError").textContent = "Invalid username or password. Please try again.";
+      }
+    }
+    function handleLogout() {
+      currentUser = null;
+      localStorage.removeItem("cachedUser");
+      hideAppUI();
+    }
+    function showAppUI() {
+      document.getElementById("authOverlay").style.display = "none";
+      document.getElementById("mainNav").style.display = "flex";
+      document.getElementById("logoutBtn").style.display = "inline-block";
+      document.getElementById("userInfo").textContent = `${currentUser.username} (${currentUser.role.toUpperCase()})`;
+      const adminElems = document.querySelectorAll(".admin-only");
+      adminElems.forEach(el => el.style.display = currentUser.role === "admin" ? "inline-block" : "none");
+      switchTab('pos');
+      setupRealtimeListeners();
+    }
+    function hideAppUI() {
+      document.getElementById("authOverlay").style.display = "flex";
+      document.getElementById("mainNav").style.display = "none";
+      document.getElementById("logoutBtn").style.display = "none";
+      document.getElementById("userInfo").textContent = "Not Logged In";
+      document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+    }
+    function renderUsers() {
+      const users = JSON.parse(localStorage.getItem('pos_users') || '[]');
+      document.getElementById("usersTable").innerHTML = users.map((u, i) => `
+        <tr>
+          <td>${u.username}</td>
+          <td>${u.pass}</td>
+          <td>${u.role.toUpperCase()}</td>
+          <td>
+            ${u.username.toLowerCase() !== 'admin' ? 
+              `<button class="btn-danger btn-sm" onclick="deleteUser(${i})">Delete</button>` : 
+              '<i>Master</i>'}
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById("changeUserSelect").innerHTML = users.map(u => `
+        <option value="${u.username}">${u.username} (${u.role})</option>
+      `).join('');
+    }
+    async function createUser(e) {
+      e.preventDefault();
+      if (currentUser.role !== "admin") return;
+      const username = document.getElementById("newUsername").value.trim();
+      const pass = document.getElementById("newUserPass").value;
+      const role = document.getElementById("newUserRole").value;
+      const statusEl = document.getElementById("userCreateStatus");
+      
+      let users = JSON.parse(localStorage.getItem('pos_users') || '[]');
+      if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+        statusEl.style.color = "#ef4444";
+        statusEl.textContent = "Error: A user with this username already exists.";
+        return;
+      }
+      
+      const newUser = { username, pass, role };
+      
+      if (navigator.onLine) {
+        try {
+          await db.collection("users").doc(username).set(newUser);
+        } catch (err) {
+          console.error("Cloud user creation failed:", err);
+        }
+      }
+      
+      users.push(newUser);
+      localStorage.setItem('pos_users', JSON.stringify(users));
+      
+      statusEl.style.color = "#10b981";
+      statusEl.textContent = `User '${username}' successfully created.`;
+      e.target.reset();
+      renderUsers();
+    }
+    async function changePassword(e) {
+      e.preventDefault();
+      if (currentUser.role !== "admin") return;
+      const targetUsername = document.getElementById("changeUserSelect").value;
+      const newPass = document.getElementById("changeUserPass").value;
+      const statusEl = document.getElementById("userPassStatus");
+      
+      let users = JSON.parse(localStorage.getItem('pos_users') || '[]');
+      const userIndex = users.findIndex(u => u.username === targetUsername);
+      
+      if (userIndex !== -1) {
+        users[userIndex].pass = newPass;
+        localStorage.setItem('pos_users', JSON.stringify(users));
+        
+        if (navigator.onLine) {
+          try {
+            await db.collection("users").doc(targetUsername).update({ pass: newPass });
+          } catch (err) {
+            console.error("Cloud password update failed:", err);
+          }
+        }
+        
+        statusEl.style.color = "#10b981";
+        statusEl.textContent = `Password updated for '${targetUsername}'.`;
+        e.target.reset();
+        renderUsers();
+      }
+    }
+    async function deleteUser(index) {
+      let users = JSON.parse(localStorage.getItem('pos_users') || '[]');
+      const targetUser = users[index];
+      
+      if (!targetUser) return;
+      
+      users.splice(index, 1);
+      localStorage.setItem('pos_users', JSON.stringify(users));
+      
+      if (navigator.onLine) {
+        try {
+          await db.collection("users").doc(targetUser.username).delete();
+        } catch (err) {
+          console.error("Cloud user deletion failed:", err);
+        }
+      }
+      
+      renderUsers();
+    }
+    // 3. INDEXEDDB LOCAL STORAGE
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open("FullPOSDB", 1);
+        req.onupgradeneeded = (e) => {
+          const d = e.target.result;
+          if (!d.objectStoreNames.contains("inventory")) d.createObjectStore("inventory", { keyPath: "id" });
+          if (!d.objectStoreNames.contains("sales")) d.createObjectStore("sales", { keyPath: "id" });
+          if (!d.objectStoreNames.contains("expenses")) d.createObjectStore("expenses", { keyPath: "id" });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function dbAction(storeName, mode, callback) {
+      const localDb = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = localDb.transaction(storeName, mode);
+        const store = tx.objectStore(storeName);
+        const req = callback(store);
+        
+        tx.oncomplete = () => resolve(req ? req.result : true);
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+    // 4. TAB CONTROLLER
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`tab-${tabId}`).classList.add('active');
+      
+      const activeBtn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
+      
+      refreshAll();
+      if(tabId === 'users') renderUsers();
+    }
+    // 5. INVENTORY LOGIC
+    async function saveInventoryItem(e) {
+      e.preventDefault();
+      const formElement = e.target;
+      
+      const item = {
+        id: "INV-" + Date.now(),
+        name: document.getElementById("invName").value,
+        costPrice: parseFloat(document.getElementById("invCostPrice").value) || 0,
+        price: parseFloat(document.getElementById("invPrice").value),
+        stock: parseInt(document.getElementById("invStock").value),
+        synced: false
+      };
+      
+      formElement.reset();
+      
+      await dbAction("inventory", "readwrite", store => store.put(item));
+      if (navigator.onLine) {
+        try {
+          await db.collection("inventory").doc(item.id).set(item);
+          item.synced = true;
+          await dbAction("inventory", "readwrite", store => store.put(item));
+        } catch (err) {
+          console.error("Cloud inventory save failed:", err);
+        }
+      }
+      refreshAll();
+    }
+    async function updateEntireItem(id) {
+      const item = inventoryCache.find(i => i.id === id);
+      if (!item) return;
+      
+      const row = document.getElementById(`inv-row-${id}`);
+      if (!row) return;
+      
+      const costInput = row.querySelector('.inv-cost-input');
+      const priceInput = row.querySelector('.inv-price-input');
+      const stockInput = row.querySelector('.table-input-stock');
+      
+      const newCost = parseFloat(costInput.value);
+      const newPrice = parseFloat(priceInput.value);
+      const stockDelta = parseInt(stockInput.value);
+      
+      if (!isNaN(newCost) && newCost >= 0) item.costPrice = newCost;
+      if (!isNaN(newPrice) && newPrice >= 0) item.price = newPrice;
+      
+      if (!isNaN(stockDelta) && stockDelta !== 0) {
+        if (item.stock + stockDelta < 0) {
+          alert(`Operation denied. Current stock is ${item.stock}, cannot reduce by ${Math.abs(stockDelta)}.`);
+          refreshAll();
+          return;
+        }
+        item.stock += stockDelta;
+      }
+      
+      item.synced = false;
+      await dbAction("inventory", "readwrite", store => store.put(item));
+      
+      if (navigator.onLine) {
+        try {
+          await db.collection("inventory").doc(item.id).set(item, { merge: true });
+          item.synced = true;
+          await dbAction("inventory", "readwrite", store => store.put(item));
+        } catch (err) {
+          console.error("Cloud inventory full update failed:", err);
+        }
+      }
+      refreshAll();
+    }
+    function toggleSelectAllInventory(master) {
+      const checkboxes = document.querySelectorAll('.inv-select-chk');
+      checkboxes.forEach(cb => cb.checked = master.checked);
+    }
+    function deleteInventoryItem(id) {
+      if (!currentUser || currentUser.role !== "admin") return;
+      openInventoryDeleteModal([id], false);
+    }
+    function triggerBatchDeleteInventory() {
+      if (!currentUser || currentUser.role !== "admin") return;
+      const checkboxes = document.querySelectorAll('.inv-select-chk:checked');
+      if (checkboxes.length === 0) {
+        alert("Please select at least one inventory item to delete.");
+        return;
+      }
+      const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+      openInventoryDeleteModal(selectedIds, true);
+    }
+    let pendingInventoryDeletion = { ids: [], isBatch: false };
+    function openInventoryDeleteModal(itemIds, isBatch = false) {
+      pendingInventoryDeletion = { ids: [...itemIds], isBatch: isBatch };
+      
+      document.getElementById("deleteModalTitle").textContent = "Delete Inventory Item(s)";
+      const subtext = document.getElementById("deleteModalSubtext");
+      
+      if (isBatch) {
+        subtext.textContent = `Are you sure you want to delete ${itemIds.length} selected inventory item(s)?`;
+      } else {
+        subtext.textContent = `Are you sure you want to delete this inventory item?`;
+      }
+      document.getElementById("deleteModalActionsContainer").innerHTML = `
+        <button class="btn-danger" onclick="confirmInventoryModalAction()">Yes, Delete</button>
+        <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      `;
+      document.getElementById("deleteChoiceModal").style.display = "flex";
+    }
+    async function confirmInventoryModalAction() {
+      const idsToProcess = [...pendingInventoryDeletion.ids];
+      closeDeleteModal();
+      if (idsToProcess.length === 0) return;
+      await dbAction("inventory", "readwrite", store => {
+        for (const id of idsToProcess) {
+          store.delete(id);
+        }
+      });
+      if (navigator.onLine) {
+        const batch = db.batch();
+        idsToProcess.forEach(id => {
+          batch.delete(db.collection("inventory").doc(id));
+        });
+        try {
+          await batch.commit();
+        } catch (err) {
+          console.error("Firebase inventory batch deletion error:", err);
+        }
+      }
+      const master = document.getElementById("selectAllInventory");
+      if (master) master.checked = false;
+      document.getElementById("invSearchInput").value = "";
+      await refreshAll();
+    }
+    function filterInventoryStock() {
+      const input = document.getElementById("invSearchInput");
+      const filter = input.value.toUpperCase().trim();
+      const table = document.getElementById("inventoryMainTable");
+      const tbody = document.getElementById("inventoryTable");
+      const rows = tbody.getElementsByTagName("tr");
+      let foundAny = false;
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].classList.contains("no-result-row")) continue;
+        let rowText = rows[i].textContent || rows[i].innerText;
+        if (rowText.toUpperCase().indexOf(filter) > -1) {
+          rows[i].style.display = "";
+          foundAny = true;
+        } else {
+          rows[i].style.display = "none";
+        }
+      }
+      let existingNoResult = tbody.querySelector(".no-result-row");
+      if (!foundAny) {
+        if (!existingNoResult) {
+          const noResultRow = document.createElement("tr");
+          const totalCols = table.querySelectorAll("thead th").length;
+          noResultRow.className = "no-result-row";
+          noResultRow.innerHTML = `<td colspan="${totalCols}" style="text-align:center; color:#888; font-style:italic; padding:20px;">No stocks found matching "${input.value}"</td>`;
+          tbody.appendChild(noResultRow);
+        }
+      } else if (existingNoResult) {
+        existingNoResult.remove();
+      }
+    }
+    // 6. POS CATALOG & CART LOGIC
+    function renderCatalog() {
+      const query = document.getElementById("posSearchInput").value.toLowerCase().trim();
+      const filtered = inventoryCache.filter(i => i.stock > 0 && i.name.toLowerCase().includes(query));
+      if (filtered.length === 0) {
+        document.getElementById("posProductGrid").innerHTML = `<p style="grid-column: 1/-1; color:#9ca3af; text-align:center; margin-top:20px;">No matching items found.</p>`;
+        return;
+      }
+      document.getElementById("posProductGrid").innerHTML = filtered.map(i => `
+        <div class="product-card" onclick="addToCartDirect('${i.id}')">
+          <div class="product-name" title="${i.name}">${i.name}</div>
+          <div>
+            <div class="product-price">₦${formatNum(i.price, 2)}</div>
+            <div class="product-stock">Stock: ${formatNum(i.stock)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    let cart = [];
+    function addToCartDirect(itemId) {
+      const item = inventoryCache.find(i => i.id === itemId);
+      if (!item) return;
+      const exist = cart.find(c => c.id === item.id);
+      const currentQty = exist ? exist.qty : 0;
+      if (currentQty + 1 > item.stock) {
+        alert(`Cannot add more. Out of available stock (${formatNum(item.stock)}).`);
+        return;
+      }
+      if (exist) {
+        exist.qty += 1;
+      } else {
+        cart.push({ ...item, qty: 1 });
+      }
+      renderCart();
+    }
+    function updateCartQty(index, newQty) {
+      const parsedQty = parseInt(newQty);
+      if (isNaN(parsedQty) || parsedQty <= 0) {
+        cart.splice(index, 1);
+      } else {
+        const item = cart[index];
+        if (parsedQty > item.stock) {
+          alert(`Quantity exceeds available stock (${formatNum(item.stock)}).`);
+          item.qty = item.stock;
+        } else {
+          item.qty = parsedQty;
+        }
+      }
+      renderCart();
+    }
+    function adjustCartQty(index, delta) {
+      const item = cart[index];
+      if (!item) return;
+      const targetQty = item.qty + delta;
+      updateCartQty(index, targetQty);
+    }
+    function renderCart() {
+      const tbody = document.getElementById("cartItems");
+      if (cart.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#9ca3af; padding:20px 0;">Cart is empty</td></tr>`;
+        document.getElementById("cartTotal").textContent = "0.00";
+        return;
+      }
+      tbody.innerHTML = cart.map((c, i) => `
+        <tr>
+          <td><strong style="font-size:13px;">${c.name}</strong><br><small style="color:#6b7280;">₦${formatNum(c.price, 2)}</small></td>
+          <td style="text-align:center;">
+            <div class="cart-qty-ctrl">
+              <button class="cart-qty-btn" onclick="adjustCartQty(${i}, -1)">-</button>
+              <input type="number" class="cart-qty-input" value="${c.qty}" min="1" max="${c.stock}" onchange="updateCartQty(${i}, this.value)">
+              <button class="cart-qty-btn" onclick="adjustCartQty(${i}, 1)">+</button>
+            </div>
+          </td>
+          <td style="font-weight:600;">₦${formatNum(c.price * c.qty, 2)}</td>
+          <td><button class="btn-danger btn-sm" onclick="cart.splice(${i},1);renderCart();">✕</button></td>
+        </tr>
+      `).join('');
+      const total = cart.reduce((s, c) => s + (c.price * c.qty), 0);
+      document.getElementById("cartTotal").textContent = formatNum(total, 2);
+    }
+    function promptCheckout() {
+      if (cart.length === 0) return;
+      const total = cart.reduce((s, c) => s + (c.price * c.qty), 0);
+      document.getElementById("checkoutModalTotal").textContent = formatNum(total, 2);
+      document.getElementById("checkoutConfirmModal").style.display = "flex";
+    }
+    function closeCheckoutConfirmModal() {
+      document.getElementById("checkoutConfirmModal").style.display = "none";
+    }
+    async function confirmCheckoutAction() {
+      closeCheckoutConfirmModal();
+      if (cart.length === 0) return;
+      const total = cart.reduce((s, c) => s + (c.price * c.qty), 0);
+      
+      const saleId = `${terminalId}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      
+      const sale = {
+        id: saleId,
+        cashierUsername: currentUser.username,
+        items: JSON.parse(JSON.stringify(cart)),
+        total: total,
+        date: new Date().toISOString(),
+        synced: false
+      };
+      if (navigator.onLine) {
+        try {
+          await db.runTransaction(async (transaction) => {
+            for (const cartItem of cart) {
+              const invRef = db.collection("inventory").doc(cartItem.id);
+              const invDoc = await transaction.get(invRef);
+              
+              if (!invDoc.exists) {
+                throw new Error(`Product ${cartItem.name} no longer exists.`);
+              }
+              
+              const currentStock = invDoc.data().stock;
+              if (currentStock < cartItem.qty) {
+                throw new Error(`Insufficient stock for ${cartItem.name}. Only ${formatNum(currentStock)} left.`);
+              }
+              
+              transaction.update(invRef, { stock: currentStock - cartItem.qty });
+            }
+            const saleRef = db.collection("sales").doc(sale.id);
+            transaction.set(saleRef, { ...sale, synced: true }, { merge: true });
+          });
+          sale.synced = true;
+        } catch (err) {
+          console.error("Online checkout transaction failed, falling back to local:", err);
+          alert(err.message);
+          return;
+        }
+      }
+      const localDb = await openDB();
+      await new Promise((resolve, reject) => {
+        const tx = localDb.transaction(["inventory", "sales"], "readwrite");
+        const invStore = tx.objectStore("inventory");
+        const salesStore = tx.objectStore("sales");
+        for (const cartItem of cart) {
+          const invItem = inventoryCache.find(i => i.id === cartItem.id);
+          if (invItem) {
+            invItem.stock -= cartItem.qty;
+            invStore.put(invItem);
+          }
+        }
+        salesStore.put(sale);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+      showReceipt(sale);
+      cart = [];
+      renderCart();
+      refreshAll();
+    }
+    // 7. EXPENSES LOGIC
+    async function saveExpense(e) {
+      e.preventDefault();
+      const formElement = e.target;
+      
+      const exp = {
+        id: "EXP-" + Date.now(),
+        desc: document.getElementById("expDesc").value,
+        amount: parseFloat(document.getElementById("expAmount").value),
+        date: new Date().toISOString(),
+        synced: false
+      };
+      
+      formElement.reset();
+      
+      await dbAction("expenses", "readwrite", store => store.put(exp));
+      if (navigator.onLine) {
+        try {
+          await db.collection("expenses").doc(exp.id).set({ ...exp, synced: true }, { merge: true });
+          exp.synced = true;
+          await dbAction("expenses", "readwrite", store => store.put(exp));
+        } catch (err) {
+          console.error("Cloud expense save failed:", err);
+        }
+      }
+      refreshAll();
+    }
+    function toggleSelectAllExpenses(master) {
+      const checkboxes = document.querySelectorAll('.exp-select-chk');
+      checkboxes.forEach(cb => cb.checked = master.checked);
+    }
+    function deleteExpense(expenseId) {
+      if (!currentUser || currentUser.role !== "admin") return;
+      openExpensesDeleteModal([expenseId], false);
+    }
+    function triggerBatchDeleteExpenses() {
+      if (!currentUser || currentUser.role !== "admin") return;
+      const checkboxes = document.querySelectorAll('.exp-select-chk:checked');
+      if (checkboxes.length === 0) {
+        alert("Please select at least one expense to delete.");
+        return;
+      }
+      const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+      openExpensesDeleteModal(selectedIds, true);
+    }
+    let pendingExpensesDeletion = { ids: [], isBatch: false };
+    function openExpensesDeleteModal(expenseIds, isBatch = false) {
+      pendingExpensesDeletion = { ids: [...expenseIds], isBatch: isBatch };
+      
+      document.getElementById("deleteModalTitle").textContent = "Delete Expense Record(s)";
+      const subtext = document.getElementById("deleteModalSubtext");
+      
+      if (isBatch) {
+        subtext.textContent = `Are you sure you want to delete ${expenseIds.length} selected expense record(s)?`;
+      } else {
+        subtext.textContent = `Are you sure you want to delete this expense record?`;
+      }
+      document.getElementById("deleteModalActionsContainer").innerHTML = `
+        <button class="btn-danger" onclick="confirmExpensesModalAction()">Yes, Delete</button>
+        <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      `;
+      document.getElementById("deleteChoiceModal").style.display = "flex";
+    }
+    async function confirmExpensesModalAction() {
+      const idsToProcess = [...pendingExpensesDeletion.ids];
+      closeDeleteModal();
+      if (idsToProcess.length === 0) return;
+      await dbAction("expenses", "readwrite", store => {
+        for (const id of idsToProcess) {
+          store.delete(id);
+        }
+      });
+      if (navigator.onLine) {
+        const batch = db.batch();
+        idsToProcess.forEach(id => {
+          batch.delete(db.collection("expenses").doc(id));
+        });
+        try {
+          await batch.commit();
+        } catch (err) {
+          console.error("Firebase expense batch deletion error:", err);
+        }
+      }
+      const master = document.getElementById("selectAllExpenses");
+      if (master) master.checked = false;
+      document.getElementById("expSearchInput").value = "";
+      await refreshAll();
+    }
+    function filterExpensesHistory() {
+      const input = document.getElementById("expSearchInput");
+      const filter = input.value.toUpperCase().trim();
+      const table = document.getElementById("expensesMainTable");
+      const tbody = document.getElementById("expensesTable");
+      const rows = tbody.getElementsByTagName("tr");
+      let foundAny = false;
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].classList.contains("no-result-row")) continue;
+        let rowText = rows[i].textContent || rows[i].innerText;
+        if (rowText.toUpperCase().indexOf(filter) > -1) {
+          rows[i].style.display = "";
+          foundAny = true;
+        } else {
+          rows[i].style.display = "none";
+        }
+      }
+      let existingNoResult = tbody.querySelector(".no-result-row");
+      if (!foundAny) {
+        if (!existingNoResult) {
+          const noResultRow = document.createElement("tr");
+          const totalCols = table.querySelectorAll("thead th").length;
+          noResultRow.className = "no-result-row";
+          noResultRow.innerHTML = `<td colspan="${totalCols}" style="text-align:center; color:#888; font-style:italic; padding:20px;">No expenses found matching "${input.value}"</td>`;
+          tbody.appendChild(noResultRow);
+        }
+      } else if (existingNoResult) {
+        existingNoResult.remove();
+      }
+    }
+    // 8. RECEIPT LOGIC
+    function showReceipt(sale) {
+      document.getElementById("recCashier").textContent = `Cashier: ${sale.cashierUsername || 'N/A'}`;
+      document.getElementById("recDate").textContent = new Date(sale.date).toLocaleString();
+      document.getElementById("recItems").innerHTML = sale.items.map(i => `
+        <div style="display:flex; justify-content:space-between;">
+          <span>${i.name} x${formatNum(i.qty)}</span>
+          <span>₦${formatNum(i.price * i.qty, 2)}</span>
+        </div>
+      `).join('');
+      document.getElementById("recTotal").textContent = `₦${formatNum(sale.total, 2)}`;
+      document.getElementById("receiptModal").style.display = "flex";
+    }
+    function closeModal() { document.getElementById("receiptModal").style.display = "none"; }
+    // 9. ADMIN SALES DELETION & RETURN MANAGEMENT (FULLY FIXED FOR BATCH & MULTI-ITEM RESTORATION)
+    let pendingSalesDeletion = { ids: [], isBatch: false };
+    function toggleSelectAllSales(master) {
+      const checkboxes = document.querySelectorAll('.sale-select-chk');
+      checkboxes.forEach(cb => cb.checked = master.checked);
+    }
+    function openSalesDeleteModal(saleIds, isBatch = false) {
+      pendingSalesDeletion = { ids: [...saleIds], isBatch: isBatch };
+      
+      document.getElementById("deleteModalTitle").textContent = "Delete Sale Record";
+      const subtext = document.getElementById("deleteModalSubtext");
+      
+      if (isBatch) {
+        subtext.textContent = `Select how you want to process deletion for ${formatNum(saleIds.length)} selected sale(s):`;
+      } else {
+        subtext.textContent = `Select how you want to process deletion for Sale #${saleIds[0]}:`;
+      }
+      document.getElementById("deleteModalActionsContainer").innerHTML = `
+        <button class="btn-primary" onclick="confirmSalesModalAction(true)">Delete & Restore Stock</button>
+        <button class="btn-danger" onclick="confirmSalesModalAction(false)">Delete Without Restoring</button>
+        <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      `;
+      document.getElementById("deleteChoiceModal").style.display = "flex";
+    }
+    function closeDeleteModal() {
+      document.getElementById("deleteChoiceModal").style.display = "none";
+      pendingSalesDeletion = { ids: [], isBatch: false };
+      pendingInventoryDeletion = { ids: [], isBatch: false };
+      pendingExpensesDeletion = { ids: [], isBatch: false };
+    }
+    async function confirmSalesModalAction(restoreStock) {
+      const idsToProcess = [...pendingSalesDeletion.ids];
+      closeDeleteModal();
+      if (idsToProcess.length === 0) return;
+      
+      const localSales = await dbAction("sales", "readonly", store => store.getAll());
+      const salesMap = new Map(localSales.map(s => [s.id, s]));
+      
+      const localDb = await openDB();
+      
+      // Update local storage / IndexedDB with aggregated stock adjustments across ALL deleted sales/items
+      await new Promise((resolve, reject) => {
+        const tx = localDb.transaction(["inventory", "sales"], "readwrite");
+        const invStore = tx.objectStore("inventory");
+        const salesStore = tx.objectStore("sales");
+        
+        const getReq = invStore.getAll();
+        getReq.onsuccess = () => {
+          const inventory = getReq.result;
+          const invMap = new Map(inventory.map(i => [i.id, i]));
+          
+          if (restoreStock) {
+            for (const saleId of idsToProcess) {
+              const sale = salesMap.get(saleId);
+              if (sale && sale.items) {
+                for (const item of sale.items) {
+                  let invItem = item.id ? invMap.get(item.id) : null;
+                  if (!invItem) {
+                    invItem = inventory.find(i => i.name.toLowerCase() === (item.name || '').toLowerCase());
+                  }
+                  if (invItem) {
+                    invItem.stock = (invItem.stock || 0) + (item.qty || 0);
+                    invItem.synced = false;
+                    invStore.put(invItem);
+                    invMap.set(invItem.id, invItem); // Update map in case multiple sales reference the same item
+                  }
+                }
+              }
+            }
+          }
+          
+          for (const saleId of idsToProcess) {
+            salesStore.delete(saleId);
+          }
+        };
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+
+      // Handle Firebase synchronization for both sales deletion and inventory stock restoration across all items
+      if (navigator.onLine) {
+        try {
+          const batch = db.batch();
+          
+          if (restoreStock) {
+            // Aggregate restoration quantities per inventory ID to prevent write conflicts or overwriting increments in batch
+            const restorationMap = {};
+            for (const saleId of idsToProcess) {
+              const sale = salesMap.get(saleId);
+              if (sale && sale.items) {
+                for (const item of sale.items) {
+                  if (item.id) {
+                    restorationMap[item.id] = (restorationMap[item.id] || 0) + (item.qty || 0);
+                  }
+                }
+              }
+            }
+            
+            for (const [invId, qtyToAdd] of Object.entries(restorationMap)) {
+              const invRef = db.collection("inventory").doc(invId);
+              const invDoc = await invRef.get();
+              if (invDoc.exists) {
+                const currentStock = invDoc.data().stock || 0;
+                batch.update(invRef, { stock: currentStock + qtyToAdd });
+              }
+            }
+          }
+          
+          for (const saleId of idsToProcess) {
+            batch.delete(db.collection("sales").doc(saleId));
+          }
+          await batch.commit();
+        } catch (err) {
+          console.error("Firebase deletion/restoration batch error:", err);
+        }
+      }
+
+      const master = document.getElementById("selectAllSales");
+      if (master) master.checked = false;
+      document.getElementById("salesSearchInput").value = "";
+      await refreshAll();
+    }
+    function deleteSale(saleId) {
+      if (!currentUser || currentUser.role !== "admin") return;
+      openSalesDeleteModal([saleId], false);
+    }
+    function triggerBatchDelete() {
+      if (!currentUser || currentUser.role !== "admin") return;
+      const checkboxes = document.querySelectorAll('.sale-select-chk:checked');
+      if (checkboxes.length === 0) {
+        alert("Please select at least one sale to delete.");
+        return;
+      }
+      const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+      openSalesDeleteModal(selectedIds, true);
+    }
+    // 10. SALES HISTORY SEARCH LOGIC
+    function filterSalesHistory() {
+      const input = document.getElementById("salesSearchInput");
+      const filter = input.value.toUpperCase().trim();
+      const table = document.getElementById("salesMainTable");
+      const tbody = document.getElementById("salesTable");
+      const rows = tbody.getElementsByTagName("tr");
+      let foundAny = false;
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].classList.contains("no-result-row")) continue;
+        let rowText = rows[i].textContent || rows[i].innerText;
+        if (rowText.toUpperCase().indexOf(filter) > -1) {
+          rows[i].style.display = "";
+          foundAny = true;
+        } else {
+          rows[i].style.display = "none";
+        }
+      }
+      let existingNoResult = tbody.querySelector(".no-result-row");
+      if (!foundAny) {
+        if (!existingNoResult) {
+          const noResultRow = document.createElement("tr");
+          const totalCols = table.querySelectorAll("thead th").length;
+          noResultRow.className = "no-result-row";
+          noResultRow.innerHTML = `<td colspan="${totalCols}" style="text-align:center; color:#888; font-style:italic; padding:20px;">No receipts found matching "${input.value}"</td>`;
+          tbody.appendChild(noResultRow);
+        }
+      } else if (existingNoResult) {
+        existingNoResult.remove();
+      }
+    }
+    // 11. DATA RENDER & REFRESH + ANALYTICS COMPUTATION
+    async function refreshAll() {
+      inventoryCache = await dbAction("inventory", "readonly", store => store.getAll());
+      const sales = await dbAction("sales", "readonly", store => store.getAll());
+      const expenses = await dbAction("expenses", "readonly", store => store.getAll());
+      const isAdmin = currentUser && currentUser.role === "admin";
+      // Inventory Table - Expanded width class (.table-input) for cost and price fields
+      document.getElementById("inventoryTable").innerHTML = inventoryCache.map(i => `
+        <tr id="inv-row-${i.id}">
+          ${isAdmin ? `<td style="text-align:center;"><input type="checkbox" class="inv-select-chk" value="${i.id}"></td>` : '<td class="admin-only"></td>'}
+          <td><strong>${i.name}</strong></td>
+          <td><input type="number" step="0.01" class="table-input inv-cost-input" value="${(i.costPrice || 0).toFixed(2)}"></td>
+          <td><input type="number" step="0.01" class="table-input inv-price-input" value="${i.price.toFixed(2)}"></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-weight:600; min-width:30px; text-align:right;">${formatNum(i.stock)}</span>
+              <input type="number" class="table-input-stock" placeholder="+/-" value="">
+            </div>
+          </td>
+          ${isAdmin ? `<td><button class="btn-primary btn-sm" onclick="updateEntireItem('${i.id}')">Update</button> <button class="btn-danger btn-sm" onclick="deleteInventoryItem('${i.id}')">Delete</button></td>` : '<td class="admin-only"></td>'}
+        </tr>
+      `).join('');
+      if (document.getElementById("invSearchInput").value.trim() !== "") {
+        filterInventoryStock();
+      }
+      renderCatalog();
+      document.getElementById("batchDeleteBtn").style.display = isAdmin ? "inline-block" : "none";
+      document.getElementById("batchDeleteInvBtn").style.display = isAdmin ? "inline-block" : "none";
+      document.getElementById("batchDeleteExpBtn").style.display = isAdmin ? "inline-block" : "none";
+      // Sales Table
+      document.getElementById("salesTable").innerHTML = sales.slice().reverse().map(s => `
+        <tr>
+          ${isAdmin ? `<td style="text-align:center;"><input type="checkbox" class="sale-select-chk" value="${s.id}"></td>` : '<td class="admin-only"></td>'}
+          <td>${s.id}</td>
+          <td>${s.cashierUsername || 'N/A'}</td>
+          <td>${new Date(s.date).toLocaleString()}</td>
+          <td>₦${formatNum(s.total, 2)}</td>
+          <td><span class="status-badge ${s.synced ? 'online' : 'offline'}">${s.synced ? 'Synced' : 'Local'}</span></td>
+          <td><button class="btn-primary btn-sm" onclick='showReceipt(${JSON.stringify(s)})'>Receipt</button></td>
+          ${isAdmin ? `<td><button class="btn-danger btn-sm" onclick="deleteSale('${s.id}')">Delete</button></td>` : '<td class="admin-only"></td>'}
+        </tr>
+      `).join('');
+      if (document.getElementById("salesSearchInput").value.trim() !== "") {
+        filterSalesHistory();
+      }
+      // Expenses Table
+      document.getElementById("expensesTable").innerHTML = expenses.slice().reverse().map(e => `
+        <tr>
+          ${isAdmin ? `<td style="text-align:center;"><input type="checkbox" class="exp-select-chk" value="${e.id}"></td>` : '<td class="admin-only"></td>'}
+          <td>${e.desc}</td>
+          <td>₦${formatNum(e.amount, 2)}</td>
+          <td>${new Date(e.date).toLocaleDateString()}</td>
+          ${isAdmin ? `<td><button class="btn-danger btn-sm" onclick="deleteExpense('${e.id}')">Delete</button></td>` : '<td class="admin-only"></td>'}
+        </tr>
+      `).join('');
+      if (document.getElementById("expSearchInput").value.trim() !== "") {
+        filterExpensesHistory();
+      }
+      // --- ADVANCED ANALYTICS COMPUTATION ---
+      const totalStockCount = inventoryCache.reduce((acc, item) => acc + (item.stock || 0), 0);
+      const totalStockVal = inventoryCache.reduce((acc, item) => acc + ((item.costPrice || 0) * (item.stock || 0)), 0);
+      const totalExpensesVal = expenses.reduce((acc, exp) => acc + (exp.amount || 0), 0);
+      const totalSalesCount = sales.length;
+      let totalItemsSold = 0;
+      let totalRevenueVal = 0;
+      let totalCostOfGoodsSold = 0;
+      const productStatsMap = {};
+      inventoryCache.forEach(item => {
+        productStatsMap[item.id] = {
+          name: item.name,
+          unitsSold: 0,
+          revenue: 0
+        };
+      });
+      sales.forEach(s => {
+        totalRevenueVal += (s.total || 0);
+        if (s.items) {
+          s.items.forEach(item => {
+            totalItemsSold += (item.qty || 0);
+            totalCostOfGoodsSold += ((item.costPrice || 0) * (item.qty || 0));
+            let foundKey = Object.keys(productStatsMap).find(k => k === item.id);
+            if (!foundKey) {
+              foundKey = Object.keys(productStatsMap).find(k => productStatsMap[k].name.toLowerCase() === item.name.toLowerCase());
+            }
+            if (foundKey) {
+              productStatsMap[foundKey].unitsSold += (item.qty || 0);
+              productStatsMap[foundKey].revenue += ((item.price || item.costPrice || 0) * (item.qty || 0));
+            } else {
+              productStatsMap[item.id || item.name] = {
+                name: item.name,
+                unitsSold: (item.qty || 0),
+                revenue: ((item.price || 0) * (item.qty || 0))
+              };
+            }
+          });
+        }
+      });
+      const totalGrossProfit = totalRevenueVal - totalCostOfGoodsSold;
+      const netProfitVal = totalGrossProfit - totalExpensesVal;
+      const avgPerSaleVal = totalSalesCount > 0 ? (totalRevenueVal / totalSalesCount) : 0;
+      document.getElementById("anaTotalStock").textContent = formatNum(totalStockCount);
+      document.getElementById("anaStockValue").textContent = `₦${formatNum(totalStockVal, 2)}`;
+      document.getElementById("anaTotalProfit").textContent = `₦${formatNum(totalGrossProfit, 2)}`;
+      document.getElementById("anaTotalExpenses").textContent = `₦${formatNum(totalExpensesVal, 2)}`;
+      document.getElementById("anaNetProfit").textContent = `₦${formatNum(netProfitVal, 2)}`;
+      document.getElementById("anaTotalSalesCount").textContent = formatNum(totalSalesCount);
+      document.getElementById("anaTotalItemsSold").textContent = formatNum(totalItemsSold);
+      document.getElementById("anaAvgPerSale").textContent = `₦${formatNum(avgPerSaleVal, 2)}`;
+      document.getElementById("anaTotalRevenue").textContent = `₦${formatNum(totalRevenueVal, 2)}`;
+      const productStatsArray = Object.values(productStatsMap);
+      const sortedByUnits = [...productStatsArray].sort((a, b) => b.unitsSold - a.unitsSold);
+      
+      const bestSellersContainer = document.getElementById("anaBestSellersList");
+      const promoteContainer = document.getElementById("anaProductsToPromoteList");
+      const allProdTable = document.getElementById("anaAllProductsTable");
+      if (totalSalesCount === 0 || sortedByUnits.every(p => p.unitsSold === 0)) {
+        bestSellersContainer.innerHTML = `<p style="color:#6b7280; font-style:italic; margin:0;">No sales data available.</p>`;
+        
+        if (inventoryCache.length > 0) {
+          promoteContainer.innerHTML = inventoryCache.map(i => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f3f4f6;">
+              <span style="font-weight:600; font-size:14px;">${i.name}</span>
+              <span style="color:#6b7280; font-size:13px;">0 units sold</span>
+            </div>
+          `).join('');
+        } else {
+          promoteContainer.innerHTML = `<p style="color:#6b7280; font-style:italic; margin:0;">No products available.</p>`;
+        }
+      } else {
+        const topSellers = sortedByUnits.filter(p => p.unitsSold > 0).slice(0, 5);
+        if (topSellers.length > 0) {
+          bestSellersContainer.innerHTML = topSellers.map(p => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f3f4f6;">
+              <span style="font-weight:600; font-size:14px;">${p.name}</span>
+              <span style="color:var(--primary); font-weight:700; font-size:14px;">${formatNum(p.unitsSold)} sold (₦${formatNum(p.revenue, 2)})</span>
+            </div>
+          `).join('');
+        } else {
+          bestSellersContainer.innerHTML = `<p style="color:#6b7280; font-style:italic; margin:0;">No sales data available.</p>`;
+        }
+        const slowMovers = sortedByUnits.filter(p => p.unitsSold === 0);
+        if (slowMovers.length > 0) {
+          promoteContainer.innerHTML = slowMovers.map(p => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f3f4f6;">
+              <span style="font-weight:600; font-size:14px;">${p.name}</span>
+              <span style="color:#6b7280; font-size:13px;">0 units sold</span>
+            </div>
+          `).join('');
+        } else {
+          promoteContainer.innerHTML = `<p style="color:#6b7280; font-style:italic; margin:0;">All products have recorded sales!</p>`;
+        }
+      }
+      if (productStatsArray.length === 0) {
+        allProdTable.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#6b7280; font-style:italic;">No products found.</td></tr>`;
+      } else {
+        allProdTable.innerHTML = productStatsArray.map(p => {
+          let statusBadgeHTML = p.unitsSold > 0 ? `<span style="background:#e6f4ea; color:#137333; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Active</span>` : `<span style="background:#f3f4f6; color:#6b7280; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">No Sales</span>`;
+          return `
+            <tr>
+              <td><strong>${p.name}</strong></td>
+              <td style="text-align:center;">${formatNum(p.unitsSold)}</td>
+              <td style="text-align:right;">₦${formatNum(p.revenue, 2)}</td>
+              <td style="text-align:center;">${statusBadgeHTML}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+    // 12. REAL-TIME FIREBASE LISTENERS
+    function setupRealtimeListeners() {
+      if (!db) return;
+      
+      db.collection("users").onSnapshot((snapshot) => {
+        let users = [];
+        snapshot.forEach(doc => {
+          users.push(doc.data());
+        });
+        if (users.length === 0) {
+          users = [{ username: 'admin', pass: '1234', role: 'admin' }];
+        }
+        localStorage.setItem('pos_users', JSON.stringify(users));
+        if (document.getElementById('tab-users').classList.contains('active')) {
+          renderUsers();
+        }
+      });
+      db.collection("inventory").onSnapshot(async (snapshot) => {
+        const localDb = await openDB();
+        await new Promise((resolve) => {
+          const tx = localDb.transaction("inventory", "readwrite");
+          const store = tx.objectStore("inventory");
+          snapshot.docChanges().forEach(async (change) => {
+            const data = change.doc.data();
+            if (change.type === "added" || change.type === "modified") {
+              store.put(data);
+            } else if (change.type === "removed") {
+              store.delete(change.doc.id);
+            }
+          });
+          tx.oncomplete = () => resolve(true);
+        });
+        refreshAll();
+      });
+      db.collection("sales").onSnapshot(async (snapshot) => {
+        const localDb = await openDB();
+        await new Promise((resolve) => {
+          const tx = localDb.transaction("sales", "readwrite");
+          const store = tx.objectStore("sales");
+          snapshot.docChanges().forEach(async (change) => {
+            const data = change.doc.data();
+            if (change.type === "added" || change.type === "modified") {
+              store.put(data);
+            } else if (change.type === "removed") {
+              store.delete(change.doc.id);
+            }
+          });
+          tx.oncomplete = () => resolve(true);
+        });
+        refreshAll();
+      });
+      db.collection("expenses").onSnapshot(async (snapshot) => {
+        const localDb = await openDB();
+        await new Promise((resolve) => {
+          const tx = localDb.transaction("expenses", "readwrite");
+          const store = tx.objectStore("expenses");
+          snapshot.docChanges().forEach(async (change) => {
+            const data = change.doc.data();
+            if (change.type === "added" || change.type === "modified") {
+              store.put(data);
+            } else if (change.type === "removed") {
+              store.delete(change.doc.id);
+            }
+          });
+          tx.oncomplete = () => resolve(true);
+        });
+        refreshAll();
+      });
+    }
+    // 13. BACKGROUND SYNC LOGIC
+    async function syncData() {
+      if (!navigator.onLine) {
+        document.getElementById("statusBadge").textContent = "OFFLINE (Local Mode)";
+        document.getElementById("statusBadge").className = "status-badge offline";
+        return;
+      }
+      document.getElementById("statusBadge").textContent = "ONLINE (Auto-Syncing)";
+      document.getElementById("statusBadge").className = "status-badge online";
+      try {
+        const localSales = await dbAction("sales", "readonly", store => store.getAll());
+        for (const s of localSales.filter(x => !x.synced)) {
+          await db.collection("sales").doc(s.id).set({ ...s, synced: true }, { merge: true });
+          s.synced = true;
+          await dbAction("dbAction", "readwrite", store => store.put(s));
+        }
+        const localExpenses = await dbAction("expenses", "readonly", store => store.getAll());
+        for (const e of localExpenses.filter(x => !x.synced)) {
+          await db.collection("expenses").doc(e.id).set({ ...e, synced: true }, { merge: true });
+          e.synced = true;
+          await dbAction("expenses", "readwrite", store => store.put(e));
+        }
+      } catch (err) {
+        console.error("Sync error:", err);
+      }
+      refreshAll();
+    }
+    window.addEventListener("online", syncData);
+    window.addEventListener("offline", syncData);
+  </script>
+</body>
+</html>

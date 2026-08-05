@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hybrid POS & Business Suite</title>
+  <title>Dqts Frangrance Corner and Emporium</title>
   <style>
     :root { --primary: #4f46e5; --bg: #f4f5f7; --card: #ffffff; --text: #1f2937; }
     * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
@@ -76,7 +76,7 @@
   <!-- AUTH OVERLAY -->
   <div id="authOverlay">
     <div class="auth-box">
-      <h3 style="margin-top:0;">POS Login</h3>
+      <h3 style="margin-top:0;">Dqts</h3>
       <form onsubmit="handleLogin(event)">
         <input type="text" id="loginUsername" placeholder="Username" required>
         <input type="password" id="loginPassword" placeholder="Password" required>
@@ -86,7 +86,7 @@
     </div>
   </div>
   <header>
-    <h2 style="margin:0;">Hybrid Business POS</h2>
+    <h2 style="margin:0;">Welcome</h2>
     <div style="display:flex; align-items:center; gap:15px;">
       <span id="userInfo" style="font-weight:bold; font-size:14px;">Not Logged In</span>
       <div id="statusBadge" class="status-badge online">Checking connection...</div>
@@ -94,8 +94,8 @@
     </div>
   </header>
   <nav id="mainNav">
-    <button class="nav-btn active" onclick="switchTab('pos')">Register (POS)</button>
-    <button class="nav-btn" onclick="switchTab('sales')">Sales & Receipts</button>
+    <button class="nav-btn active" onclick="switchTab('pos')">Sell Product</button>
+    <button class="nav-btn" onclick="switchTab('sales')">Sales History</button>
     <button class="nav-btn admin-only" onclick="switchTab('inventory')">Inventory</button>
     <button class="nav-btn admin-only" onclick="switchTab('expenses')">Expenses</button>
     <button class="nav-btn admin-only" onclick="switchTab('analytics')">Analytics</button>
@@ -339,14 +339,14 @@
   <div id="receiptModal">
     <div class="receipt-box">
       <div id="receiptArea">
-        <h3 style="text-align:center; margin:0;">STORE RECEIPT</h3>
+        <h3 style="text-align:center; margin:0;">Dqts Fragrance Corner and Emporium</h3>
         <p style="text-align:center; font-size:12px; margin:2px 0;" id="recCashier"></p>
         <p style="text-align:center; font-size:11px;" id="recDate"></p>
         <hr>
         <div id="recItems"></div>
         <hr>
         <h4 style="display:flex; justify-content:space-between;"><span>TOTAL:</span><span id="recTotal"></span></h4>
-        <p style="text-align:center; font-size:11px;">Thank you for your business!</p>
+        <p style="text-align:center; font-size:11px;">Thank you for shopping with us!</p>
       </div>
       <button class="btn-primary" style="width:100%; margin-top:10px;" onclick="window.print()">Print</button>
       <button style="width:100%; margin-top:5px;" onclick="closeModal()">Close</button>

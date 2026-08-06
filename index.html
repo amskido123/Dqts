@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dqts Frangrance Corner and Emporium</title>
+  <title>Hybrid POS & Business Suite</title>
   <style>
     :root { --primary: #4f46e5; --bg: #f4f5f7; --card: #ffffff; --text: #1f2937; }
     * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
@@ -76,7 +76,7 @@
   <!-- AUTH OVERLAY -->
   <div id="authOverlay">
     <div class="auth-box">
-      <h3 style="margin-top:0;">Dqts</h3>
+      <h3 style="margin-top:0;">POS Login</h3>
       <form onsubmit="handleLogin(event)">
         <input type="text" id="loginUsername" placeholder="Username" required>
         <input type="password" id="loginPassword" placeholder="Password" required>
@@ -86,7 +86,7 @@
     </div>
   </div>
   <header>
-    <h2 style="margin:0;">Welcome</h2>
+    <h2 style="margin:0;">Hybrid Business POS</h2>
     <div style="display:flex; align-items:center; gap:15px;">
       <span id="userInfo" style="font-weight:bold; font-size:14px;">Not Logged In</span>
       <div id="statusBadge" class="status-badge online">Checking connection...</div>
@@ -94,8 +94,8 @@
     </div>
   </header>
   <nav id="mainNav">
-    <button class="nav-btn active" onclick="switchTab('pos')">Sell Product</button>
-    <button class="nav-btn" onclick="switchTab('sales')">Sales History</button>
+    <button class="nav-btn active" onclick="switchTab('pos')">Register (POS)</button>
+    <button class="nav-btn" onclick="switchTab('sales')">Sales & Receipts</button>
     <button class="nav-btn admin-only" onclick="switchTab('inventory')">Inventory</button>
     <button class="nav-btn admin-only" onclick="switchTab('expenses')">Expenses</button>
     <button class="nav-btn admin-only" onclick="switchTab('analytics')">Analytics</button>
@@ -339,14 +339,14 @@
   <div id="receiptModal">
     <div class="receipt-box">
       <div id="receiptArea">
-        <h3 style="text-align:center; margin:0;">Dqts Fragrance Corner and Emporium</h3>
+        <h3 style="text-align:center; margin:0;">STORE RECEIPT</h3>
         <p style="text-align:center; font-size:12px; margin:2px 0;" id="recCashier"></p>
         <p style="text-align:center; font-size:11px;" id="recDate"></p>
         <hr>
         <div id="recItems"></div>
         <hr>
         <h4 style="display:flex; justify-content:space-between;"><span>TOTAL:</span><span id="recTotal"></span></h4>
-        <p style="text-align:center; font-size:11px;">Thank you for shopping with us!</p>
+        <p style="text-align:center; font-size:11px;">Thank you for your business!</p>
       </div>
       <button class="btn-primary" style="width:100%; margin-top:10px;" onclick="window.print()">Print</button>
       <button style="width:100%; margin-top:5px;" onclick="closeModal()">Close</button>
@@ -874,20 +874,17 @@
       };
       
       const localDb = await openDB();
-
       // Perform local IndexedDB transaction: deduct stock and save sale record atomically
       try {
         await new Promise((resolve, reject) => {
           const tx = localDb.transaction(["inventory", "sales"], "readwrite");
           const invStore = tx.objectStore("inventory");
           const salesStore = tx.objectStore("sales");
-
           // Fetch all local inventory items first to safely verify and deduct stock
           const getReq = invStore.getAll();
           getReq.onsuccess = () => {
             const inventory = getReq.result;
             const invMap = new Map(inventory.map(i => [i.id, i]));
-
             for (const cartItem of cart) {
               let invItem = cartItem.id ? invMap.get(cartItem.id) : null;
               if (!invItem) {
@@ -905,11 +902,9 @@
               invItem.synced = false;
               invStore.put(invItem);
             }
-
             salesStore.put(sale);
           };
           getReq.onerror = () => reject(getReq.error);
-
           tx.oncomplete = () => resolve(true);
           tx.onerror = () => reject(tx.error);
         });
@@ -917,7 +912,6 @@
         alert(err.message);
         return;
       }
-
       // If online, perform Firestore transaction to update inventory and save sale server-side
       if (navigator.onLine) {
         try {
@@ -947,7 +941,6 @@
           console.error("Online checkout transaction failed, saved locally for background sync:", err);
         }
       }
-
       showReceipt(sale);
       cart = [];
       renderCart();
@@ -1163,7 +1156,6 @@
         tx.oncomplete = () => resolve(true);
         tx.onerror = () => reject(tx.error);
       });
-
       // Handle Firebase synchronization for both sales deletion and inventory stock restoration across all items
       if (navigator.onLine) {
         try {
@@ -1201,7 +1193,6 @@
           console.error("Firebase deletion/restoration batch error:", err);
         }
       }
-
       const master = document.getElementById("selectAllSales");
       if (master) master.checked = false;
       document.getElementById("salesSearchInput").value = "";
@@ -1455,7 +1446,6 @@
         refreshAll();
       });
       db.collection("sales").onSnapshot(async (snapshot) => {
-        const localDb = wasOpen => openDB(); // safe reference
         const localDbInstance = await openDB();
         await new Promise((resolve) => {
           const tx = localDbInstance.transaction("sales", "readwrite");
@@ -1476,7 +1466,7 @@
         const localDb = await openDB();
         await new Promise((resolve) => {
           const tx = localDb.transaction("expenses", "readwrite");
-          const store = tx.objectStore(storeName => "expenses");
+          const store = tx.objectStore("expenses"); // <-- FIXED: Corrected store name retrieval
           snapshot.docChanges().forEach(async (change) => {
             const data = change.doc.data();
             if (change.type === "added" || change.type === "modified") {

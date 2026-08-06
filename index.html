@@ -1466,7 +1466,7 @@
         const localDb = await openDB();
         await new Promise((resolve) => {
           const tx = localDb.transaction("expenses", "readwrite");
-          const store = tx.objectStore("expenses"); // <-- FIXED: Corrected store name retrieval
+          const store = tx.objectStore("expenses");
           snapshot.docChanges().forEach(async (change) => {
             const data = change.doc.data();
             if (change.type === "added" || change.type === "modified") {
